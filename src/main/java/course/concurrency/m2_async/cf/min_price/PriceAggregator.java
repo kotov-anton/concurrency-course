@@ -1,12 +1,16 @@
 package course.concurrency.m2_async.cf.min_price;
 
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class PriceAggregator {
 
@@ -23,21 +27,30 @@ public class PriceAggregator {
     }
 
     public double getMinPrice(long itemId) {
-        ExecutorService executor = Executors.newCachedThreadPool();
-        Optional<Double> min = shopIds.stream().parallel()
-                .map(shopId -> executor.submit(() -> priceRetriever.getPrice(itemId, shopId)))
-                .map(this::getValue)
-                .min(Double::compareTo);
+        try {
+            ExecutorService executor = Executors.newCachedThreadPool();
+            List<Callable<Double>> tasks = shopIds.stream().map((shopId) -> this.createTask(itemId, shopId)).collect(Collectors.toList());
+            Optional<Double> min = executor.invokeAll(tasks, 2900, TimeUnit.MILLISECONDS)
+                    .stream()
+                    .filter(f -> !f.isCancelled())
+                    .map(this::getValue)
+                    .min(Double::compareTo);
 
-        executor.shutdown();
-        return min.get();
+            return min.orElse(Double.NaN);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Double getValue(Future<Double> f) {
         try {
-            return f.get(2900, TimeUnit.MILLISECONDS);
+            return f.get();
         } catch (Exception e) {
             return Double.NaN;
         }
+    }
+
+    private Callable<Double> createTask(long itemId, long shopId) {
+        return () -> priceRetriever.getPrice(itemId, shopId);
     }
 }
