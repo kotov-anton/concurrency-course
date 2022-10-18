@@ -23,20 +23,19 @@ public class PriceAggregator {
     }
 
     public double getMinPrice(long itemId) {
-//        ExecutorService executor = Executors.newCachedThreadPool();
-        ExecutorService executor = Executors.newFixedThreadPool(shopIds.size());
-        Optional<Double> min = shopIds.stream()
+        ExecutorService executor = Executors.newCachedThreadPool();
+        Optional<Double> min = shopIds.stream().parallel()
                 .map(shopId -> executor.submit(() -> priceRetriever.getPrice(itemId, shopId)))
                 .map(this::getValue)
                 .min(Double::compareTo);
 
-//        executor.shutdown();
+        executor.shutdown();
         return min.get();
     }
 
     private Double getValue(Future<Double> f) {
         try {
-            return f.get(3, TimeUnit.SECONDS);
+            return f.get(2900, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             return Double.NaN;
         }
