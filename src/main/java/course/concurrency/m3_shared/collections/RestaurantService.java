@@ -1,9 +1,10 @@
 package course.concurrency.m3_shared.collections;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class RestaurantService {
 
@@ -13,7 +14,7 @@ public class RestaurantService {
         put("C", new Restaurant("C"));
     }};
 
-    private Object stat;
+    private Map<String, AtomicInteger> stat = new ConcurrentHashMap<>();
 
     public Restaurant getByName(String restaurantName) {
         addToStat(restaurantName);
@@ -21,11 +22,16 @@ public class RestaurantService {
     }
 
     public void addToStat(String restaurantName) {
-        // your code
+        final AtomicInteger counter = stat.putIfAbsent(restaurantName, new AtomicInteger(1));
+        if (counter != null) {
+            counter.incrementAndGet();
+        }
     }
 
     public Set<String> printStat() {
-        // your code
-        return new HashSet<>();
+        return stat.entrySet().stream()
+                .map(e -> e.getKey() + " - " + e.getValue().get())
+                .collect(Collectors.toSet());
     }
+
 }
